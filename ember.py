@@ -428,7 +428,7 @@ class MainWindow(QMainWindow):
             self.pid_worker.stop = True
             self.heater.set_enabled( False )
             self.group_heater_control.setEnabled(True)
-            self.PB_heater_enable.setText( "Enable")
+            self.PB_heater_enable.setText( "ENABLE")
 
 class pid_worker( QObject ):
     finished = pyqtSignal()
