@@ -223,7 +223,7 @@ class MainWindow(QMainWindow):
         label_celsius = QLabel(" C")
 
         self.LE_temperature.setReadOnly( True )
-        self.LE_temperature.setFixedWidth(40)
+        # self.LE_temperature.setFixedWidth(40)
         layout_temp.addWidget(label_temp)
         layout_temp.addWidget(self.LE_temperature)
         layout_temp.addWidget(label_celsius)
@@ -376,7 +376,7 @@ class MainWindow(QMainWindow):
 
     def update_temperature( self ):
         self.cur_temp = self.sensor.get_temp()
-        self.LE_temperature.setText( "%.1f" % self.cur_temp )
+        self.LE_temperature.setText( "%.2f" % self.cur_temp )
 
         self.Temps = np.roll( self.Temps, -1 )
         self.Temps[-1] = self.cur_temp
