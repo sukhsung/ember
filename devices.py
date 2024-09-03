@@ -1,92 +1,30 @@
-
 import pyvisa
-# import re, time
 
-
-
-def get_port_list():
-    """\
-    Return a list of USB serial port devices.
-
-    Entries in the list are ListPortInfo objects from the
-    serial.tools.list_ports module.  Fields of interest include:
-
-        device:  The device's full path name.
-        vid:     The device's USB vendor ID value.
-        pid:     The device's USB product ID value.
-    """
-    
+def get_port_list():    
     rm = pyvisa.ResourceManager()
-    # port_list = [p.device for p in serial.tools.list_ports.comports() if p.vid]
     port_list = [ p for p in rm.list_resources()]
-    
-    # print(port_list)
-    # print(visa_list)
-    # port_list.append( visa_list)
-    # port_list = ["HEATER", "SENSOR"]
     return port_list
 
-class thermistor_20K:
-    def __init__(self,addr):
-        self.addr = addr
-        # self.device = serial.Serial(addr)
-        
-        if addr == '':
-            self.device = None
-            self.connected = False
-        else:
-            rm = pyvisa.ResourceManager()
-            self.device = rm.open_resource( addr )
-            
-            # Check if device is correct
-            if not self.dev_check():
-                print( 'Device query is not matching Thermistor, closing connection')
-                self.device.close()
-                self.connected = False
-            else:
-                self.connected = True
-                print( 'Connected to Thermistor')
-                # self.setup_default()
-
-    def dev_check(self):
-        id = self.device.query( '*')
-        return  id.startswith( '20K Ohm Thermistor')
-    
-    def get_temp( self ):
-        self.temp =  float(self.device.query( 't'))
-        return self.temp    
-
-    def say_hi( self ):
-        print('Sensor: ' + self.addr)
-
-    
-    def close( self ):
-        self.device.close()
-        self.connected = False
-
-    
 class HP_66312A:
+    addr = None
+    connected = False
+    MAX_CURRENT = 6
+    MAX_VOLTAGE = 1.9
     
-    def __init__(self, addr):
-        self.addr = addr
-        
-        if addr == '':
-            self.device = None
+    def connect(self, addr):
+        rm = pyvisa.ResourceManager()
+        self.device = rm.open_resource( addr )
+
+        # Check if device is correct
+        if not self.dev_check():
+            print( 'Device query is not matching HP-66312A, closing connection')
+            self.device.close()
             self.connected = False
         else:
-
-            rm = pyvisa.ResourceManager()
-            self.device = rm.open_resource( addr )
-
-            # Check if device is correct
-            if not self.dev_check():
-                print( 'Device query is not matching Keithley 6220, closing connection')
-                self.device.close()
-                self.connected = False
-            else:
-                print( 'Connected to Keithley 6220')
-                self.connected = True
-                # self.setup_default()
+            print( 'Connected to HP-66312A')
+            self.addr = addr
+            self.connected = True
+            self.reset()
 
 
     def dev_check(self):
@@ -94,8 +32,8 @@ class HP_66312A:
         return  id[0].startswith( 'HEWLETT-PACKARD' ) and id[1] == '66312A'
     
     def set_current( self, current):
-        if current > 6:
-            current = 6
+        if current > self.MAX_CURRENT:
+            current = self.MAX_CURRENT
         elif current < 0:
             current = 0
 
@@ -103,8 +41,8 @@ class HP_66312A:
         self.device.write( f'CURR %f' % current)
 
     def set_voltage( self, voltage):
-        if voltage > 1.9:
-            voltage = 1.9
+        if voltage > self.MAX_VOLTAGE:
+            voltage = self.MAX_VOLTAGE
         elif voltage < 0:
             voltage = 0
 
@@ -128,7 +66,43 @@ class HP_66312A:
         self.set_voltage( 0 )
 
     def close( self ):
-        self.set_current( 0 )
-        self.set_voltage( 0 )
-        self.set_enabled( False )
+        self.reset()
+        self.connected = False
         self.device.close()
+
+class thermistor_20K:
+    addr = None
+    connected = False
+
+    def connect(self,addr):
+        rm = pyvisa.ResourceManager()
+        self.device = rm.open_resource( addr )
+
+        # Check if device is correct
+        if not self.dev_check():
+            print( 'Device query is not matching Thermistor, closing connection')
+            self.device.close()
+            self.connected = False
+        else:
+            print( 'Connected to 20K Ohm Thermistor' )
+            self.addr = addr
+            self.connected = True
+
+    def dev_check(self):
+        id = self.device.query( '*' )
+        return  id.startswith( '20K Ohm Thermistor' )
+    
+    def get_temp( self ):
+        self.temp =  float(self.device.query('t'))
+        return self.temp    
+
+    def say_hi( self ):
+        print('Sensor: ' + self.addr)
+
+    def close( self ):
+        self.connected = False
+        self.addr = None
+        self.temp = None
+        self.device.close()
+
+    
