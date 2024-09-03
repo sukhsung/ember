@@ -12,9 +12,9 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QSizePolicy
 )
-# from PyQt5 import QtGui
-# from PyQt5.QtGui import QFont, QFontDatabase,QIcon
-# from PyQt5.QtSvg import QSvgWidget
+from PyQt5 import QtGui
+from PyQt5.QtGui import QFont, QFontDatabase,QIcon
+from PyQt5.QtSvg import QSvgWidget
 
 import pyqtgraph as pg
 
@@ -30,8 +30,9 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.sensor = devices.Sensor()
-        self.heater = devices.Heater()
+        # self.heater = devices.HP_66312A()
+        self.heater = devices.XPD_1830()
+        self.sensor = devices.thermistor_20K()
         self.pid_running = False
 
         self.setWindowTitle("Ember")
@@ -58,6 +59,7 @@ class MainWindow(QMainWindow):
         layout_main.addLayout( layout_UI )
         layout_main.addWidget( self.group_pid )
         layout_main.addWidget( self.group_graph )
+        # layout_main.addWidget( self.group_logo )
 
         self.setCentralWidget( self.main_widget )
 
@@ -73,9 +75,10 @@ class MainWindow(QMainWindow):
 
         self.num_pt = 256
         self.Temps = np.zeros( self.num_pt )
-        self.Times = np.arange( self.num_pt )*self.sensor.time_interval
+        self.Times = np.arange( self.num_pt )*self.sensor_dt
         self.plot_temps = self.PW_temp.plot( self.Times, self.Temps )
         
+
 
     def make_panel_pid(self):
         self.pid_setpoint = 25
@@ -244,6 +247,7 @@ class MainWindow(QMainWindow):
         layout_sensor.setSpacing( 0 )
 
         self.group_temp.setEnabled(False)
+        self.sensor_dt = 0.1
 
     def on_click_enable_heater(self):
         # Connect Push Button
@@ -334,51 +338,64 @@ class MainWindow(QMainWindow):
         else:
             self.group_pid.setEnabled(False)
 
+    def start_heater( self ):
+        # Step 2: Create a QThread object
+        self.thread_heat = QThread()
+        # Step 3: Create a worker object
+        self.heater_worker = heater_worker()
+        self.heater_worker.sample_time = self.sensor_dt
+        # Step 4: Move worker to the thread
+        self.heater_worker.moveToThread(self.thread_heat)
+        # Step 5: Connect signals and slots
+        self.thread_heat.started.connect(self.heater_worker.start_heater)
+        self.heater_worker.signal_set_volt.connect( self.update_voltage )
+        self.heater_worker.finished.connect(self.thread_heat.quit)
+        # Step 6: Start the thread
+        self.thread_heat.start()
+
+    def update_voltage( self ):
+        self.heater.test_func()
+
     def connect_heater( self ):
         portname = self.heater_list.currentText()
         self.heater.connect(portname)
 
         if self.heater.connected:
+            self.update_heater_setting()
             self.group_heater_control.setEnabled(True)
             self.PB_heater_connect.setText("Disconnect")
             self.start_heater()
-            self.LE_Heater_MaxCurrent.setText( str(self.heater.MAX_CURRENT) )
-            self.LE_Heater_MaxVoltage.setText( str(0))
-            self.update_heater_setting()
-
-    def start_heater( self ):
-        self.thread_heat = QThread()
-        self.thread_main = QThread.currentThread() 
-        self.heater.thread_main = self.thread_main
-        self.heater.moveToThread(self.thread_heat)
-        self.thread_heat.started.connect( self.heater.start_comm )
-        self.thread_heat.finished.connect( self.thread_heat.deleteLater )
-        self.thread_heat.start()
 
     def disconnect_heater( self ):
         if self.pid_running:
             self.stop_pid()
         
-        self.heater.set_status( "DISCONNECT")
+        self.heater.close()
         self.group_heater_control.setEnabled(False)
         self.PB_heater_connect.setText("Connect")
 
     def start_sensor( self ):
-        self.thread_sensor = QThread()
-        self.thread_main = QThread.currentThread() 
-        self.sensor.thread_main = self.thread_main
-        self.sensor.moveToThread(self.thread_sensor)
-        self.thread_sensor.started.connect( self.sensor.start_comm )
-        self.sensor.signal_temp.connect( self.update_temperature )
-        self.thread_sensor.finished.connect( self.thread_sensor.deleteLater )
-        self.thread_sensor.start()
+        # Step 2: Create a QThread object
+        self.thread_temp = QThread()
+        # Step 3: Create a worker object
+        self.sensor_worker = sensor_worker()
+        self.sensor_worker.sample_time = self.sensor_dt
+        # Step 4: Move worker to the thread
+        self.sensor_worker.moveToThread(self.thread_temp)
+        # Step 5: Connect signals and slots
+        self.thread_temp.started.connect(self.sensor_worker.start_temp_measure)
+        self.sensor_worker.signal_get_temp.connect( self.update_temperature )
+        self.sensor_worker.finished.connect(self.thread_temp.quit)
+        # Step 6: Start the thread
+        self.thread_temp.start()
+
 
     def connect_sensor( self ):
         portname = self.sensor_list.currentText()
         self.sensor.connect(portname)
 
         if self.sensor.connected:
-            # self.sensor.say_hi()
+            self.sensor.say_hi()
             self.PB_sensor_connect.setText("Disconnect")
             self.group_temp.setEnabled(True)
             self.start_sensor()
@@ -386,15 +403,14 @@ class MainWindow(QMainWindow):
     def disconnect_sensor( self ):
         if self.pid_running:
             self.stop_pid()
-            
-        self.sensor.set_status( "DISCONNECT")
+        self.sensor_worker.stop = True
+        self.sensor.close()
         self.LE_temperature.setText("NA")
         self.group_temp.setEnabled(False)
         self.PB_sensor_connect.setText("Connect")
 
-    def update_temperature( self,val ):
-        # self.cur_temp = self.sensor.get_temp()
-        self.cur_temp = val
+    def update_temperature( self ):
+        self.cur_temp = self.sensor.get_temp()
         self.LE_temperature.setText( "%.2f °C" % self.cur_temp )
 
         self.Temps = np.roll( self.Temps, -1 )
@@ -432,6 +448,7 @@ class MainWindow(QMainWindow):
         # Step 3: Create a worker object
         self.pid_worker = pid_worker()
         self.update_pid_setting()
+        self.pid_worker.pid_sample_time = self.sensor_dt
         # Step 4: Move worker to the thread
         self.pid_worker.moveToThread(self.thread_pid)
 
@@ -495,6 +512,41 @@ class pid_worker( QObject ):
                 break
 
             time.sleep( self.pid_sample_time )
+
+
+class sensor_worker( QObject ):
+    finished = pyqtSignal()
+    signal_get_temp = pyqtSignal()
+    sample_time = 0.1
+    stop = False
+
+    def start_temp_measure( self ):
+        self.cur_temp = 0
+        while True:
+            self.signal_get_temp.emit()
+
+            time.sleep( self.sample_time )
+            if self.stop:
+                self.finished.emit()
+                break
+
+
+class heater_worker( QObject ):
+    finished = pyqtSignal()
+    signal_set_volt = pyqtSignal(float)
+    sample_time = 0.1
+    stop = False
+
+    def start_heater( self ):
+        i =0
+        while True:
+            
+            self.signal_set_volt.emit(i)
+            i += 1
+            time.sleep( self.sample_time )
+            if self.stop:
+                self.finished.emit()
+                break
 
 
 if __name__ == "__main__":
