@@ -1,4 +1,4 @@
-from PyQt5.QtCore import QSize, QThread, Qt, QObject, pyqtSignal
+from PyQt5.QtCore import QThread, Qt, QObject, pyqtSignal
 from PyQt5.QtWidgets import (
     QApplication,
     QVBoxLayout,
@@ -9,12 +9,8 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QWidget,
     QGroupBox,
-    QComboBox,
-    QSizePolicy
+    QComboBox
 )
-# from PyQt5 import QtGui
-# from PyQt5.QtGui import QFont, QFontDatabase,QIcon
-# from PyQt5.QtSvg import QSvgWidget
 
 import pyqtgraph as pg
 
@@ -22,9 +18,7 @@ import sys, os, time
 import numpy as np
 
 from simple_pid import PID as PID_control
-import devices2 as devices
-# import devices
-
+import devices as devices
 
 
 class MainWindow(QMainWindow):
@@ -290,6 +284,9 @@ class MainWindow(QMainWindow):
         if self.pid_running:
             self.stop_pid()
         self.heater.set_status( "DISCONNECT")
+        t0 = time.time()
+        while (time.time()-t0 < 1 and self.heater.connected):
+            pass
         
     def received_heater_connected( self, val ):
         if val :
@@ -378,6 +375,9 @@ class MainWindow(QMainWindow):
         if self.pid_running:
             self.stop_pid()            
         self.sensor.set_status( "DISCONNECT")
+        t0 = time.time()
+        while (time.time()-t0 < 1 and self.heater.connected):
+            pass
 
     def received_sensor_connected( self, val ):
         if val :
@@ -467,6 +467,7 @@ class MainWindow(QMainWindow):
         print("Exiting Ember")
         if self.heater.connected:
             self.disconnect_heater()
+
         if self.sensor.connected:
             self.disconnect_sensor()
 
