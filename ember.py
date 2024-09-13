@@ -11,6 +11,8 @@ from PyQt5.QtWidgets import (
     QGroupBox,
     QComboBox
 )
+from PyQt5.QtGui import QIcon
+from PyQt5.QtSvg import QSvgWidget
 
 import pyqtgraph as pg
 
@@ -24,6 +26,10 @@ from ember_ui import Ui_MainWindow
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
+
+        self.ember_path = os.path.dirname(os.path.abspath(__file__))
+        self.asset_path = os.path.join( ember_path, 'UI')
+
         self.setupUi(self)
         self.setWindowTitle("Ember")
 
@@ -40,6 +46,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.make_panel_sensor()
         self.make_panel_pid()
         self.make_panel_graph()
+        self.make_banner()
 
         self.update_sensor_list()
         self.update_heater_list()
@@ -97,6 +104,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.group_temp.setEnabled(False)
         self.group_graph.setEnabled(False)
 
+    def make_banner(self):
+        self.svg_logo_right = QSvgWidget( os.path.join( self.asset_path,'ember-icon.svg'), parent=self.group_logo)
+        self.svg_logo_right.renderer().setAspectRatioMode(Qt.AspectRatioMode.KeepAspectRatio)
+        # self.svg_logo_right.renderer().viewBox().setWidth( 50)
+        self.svg_logo_right.setContentsMargins( 0,0,0,0 )
+        # self.svg_logo_right.move(825, -175)
+        self.svg_logo_right.resize(100,100)
 
     #### HEATER RELATED
     def update_heater_list(self):
@@ -385,8 +399,14 @@ class pid_worker( QObject ):
 
 
 if __name__ == "__main__":
+
+    ember_path = os.path.dirname(os.path.abspath(__file__))
+    asset_path = os.path.join( ember_path, 'UI')
+
     app = QApplication(sys.argv)
     app.setApplicationName("Ember")
+    app.setWindowIcon(QIcon(os.path.join(asset_path,"ember-icon.png")))
+
     window = MainWindow()
     window.show()
     app.aboutToQuit.connect( window.on_quit )

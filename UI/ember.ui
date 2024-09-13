@@ -14,7 +14,7 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout" stretch="2,4,12">
+   <layout class="QVBoxLayout" name="verticalLayout" stretch="2,4,12,0">
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout" stretch="1,1">
       <item>
@@ -381,6 +381,25 @@
      <widget class="QGroupBox" name="group_graph">
       <property name="title">
        <string>Graph</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="group_logo">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>0</width>
+        <height>100</height>
+       </size>
+      </property>
+      <property name="title">
+       <string/>
       </property>
      </widget>
     </item>
