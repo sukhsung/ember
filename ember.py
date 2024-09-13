@@ -20,29 +20,21 @@ import numpy as np
 from simple_pid import PID as PID_control
 import devices as devices
 
-
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
+from ember_ui import Ui_MainWindow
+class MainWindow(QMainWindow, Ui_MainWindow):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setupUi(self)
+        self.setWindowTitle("Ember")
 
         self.thread_main = QThread.currentThread() 
-
         self.sensor = devices.Sensor()
         self.sensor.signal_connected.connect( self.received_sensor_connected )
-
         self.heater = devices.Heater()
         self.heater.signal_connected.connect( self.received_heater_connected )
 
         self.pid_running = False
-
-        self.setWindowTitle("Ember")
-        self.resize( 850,1000 )
-        self.setMinimumSize( 850, 1000)
-
-        self.main_widget = QWidget()
-        self.main_widget.setObjectName( "main_widget" )
-        layout_main = QVBoxLayout()
-        self.main_widget.setLayout(layout_main)
+        self.pid_worker = pid_worker()
         
         self.make_panel_heater()
         self.make_panel_sensor()
@@ -52,19 +44,8 @@ class MainWindow(QMainWindow):
         self.update_sensor_list()
         self.update_heater_list()
 
-        layout_UI = QHBoxLayout()
-        layout_UI.addWidget( self.group_sensor )
-        layout_UI.addWidget( self.group_heater )
-
-        layout_main.addLayout( layout_UI )
-        layout_main.addWidget( self.group_pid )
-        layout_main.addWidget( self.group_graph )
-
-        self.setCentralWidget( self.main_widget )
-
 
     def make_panel_graph( self ):
-        self.group_graph = QGroupBox("Graph")
         layout_graph = QHBoxLayout()
         self.group_graph.setLayout( layout_graph )
 
@@ -83,168 +64,38 @@ class MainWindow(QMainWindow):
         self.pid_P = 0.1
         self.pid_I = 0.01
         self.pid_D = 0
+        self.pid_MaxCurrent = 0
 
-        self.group_pid = QGroupBox("PID")
-        layout_PID = QHBoxLayout()
-        self.group_pid.setLayout( layout_PID )
-        layout_PID.setContentsMargins( 100,0,100,0 )
+        self.LE_PID_setpoint.setText( str(self.pid_setpoint))
+        self.LE_PID_P.setText( str(self.pid_P))
+        self.LE_PID_I.setText( str(self.pid_I))
+        self.LE_PID_D.setText( str(self.pid_D))
+        self.LE_PID_MaxCurrent.setText( str(self.pid_MaxCurrent) )
 
-        self.pid_worker = pid_worker()
-        label_SetPoint = QLabel("Set Point (°C): ")
-        label_SetPoint.setFont(self.temp_font)
-        self.LE_PID_setpoint = QLineEdit( str(self.pid_setpoint))
         self.LE_PID_setpoint.returnPressed.connect( self.update_pid_setting )
-        self.LE_PID_setpoint.setFont(self.temp_font)
-        self.LE_PID_setpoint.setMaximumWidth(70)
-
-        layout_PID_values = QVBoxLayout()
-        layout_P = QHBoxLayout()
-        layout_I = QHBoxLayout()
-        layout_D = QHBoxLayout()
-        label_P = QLabel("P: ")
-        label_P.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.LE_PID_P = QLineEdit( str(self.pid_P))
         self.LE_PID_P.returnPressed.connect( self.update_pid_setting )
-        self.LE_PID_P.setFixedWidth(80)
-        label_I = QLabel("I : ")
-        label_I.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.LE_PID_I = QLineEdit( str(self.pid_I))
         self.LE_PID_I.returnPressed.connect( self.update_pid_setting )
-        self.LE_PID_I.setFixedWidth(80)
-        label_D = QLabel("D: ")
-        label_D.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.LE_PID_D = QLineEdit( str(self.pid_D))
         self.LE_PID_D.returnPressed.connect( self.update_pid_setting )
-        self.LE_PID_D.setFixedWidth(80)
-        layout_P.addWidget( label_P )
-        layout_P.addWidget( self.LE_PID_P )
-        layout_I.addWidget( label_I)
-        layout_I.addWidget( self.LE_PID_I )
-        layout_D.addWidget( label_D )
-        layout_D.addWidget( self.LE_PID_D )
-        layout_PID_values.addLayout( layout_P )
-        layout_PID_values.addLayout( layout_I )
-        layout_PID_values.addLayout( layout_D )
-        # layout_PID_values.SetMaximumSize( 200,500)
+        self.LE_PID_MaxCurrent.returnPressed.connect( self.update_pid_setting )
 
-        self.PB_PID_run = QPushButton( "Run PID")
         self.PB_PID_run.clicked.connect( self.on_click_PID_run )
-        self.PB_PID_run.setFixedSize(100,100)
-
-        layout_PID.addWidget( label_SetPoint )
-        layout_PID.addWidget( self.LE_PID_setpoint )
-        layout_PID.addLayout( layout_PID_values )
-        layout_PID.addWidget( self.PB_PID_run )
-        
         self.group_pid.setEnabled(False)
 
 
     def make_panel_heater(self):
-        # Device Manager Panel
-        self.group_heater = QGroupBox("Heater")
-        self.group_heater.setFixedWidth( 400)
-        layout_heater = QVBoxLayout()
-        self.group_heater.setLayout( layout_heater )
-
-        # Connection Manager
-        layout_device = QHBoxLayout()
-        self.heater_list = QComboBox(  )
-        self.heater_list.setFixedWidth( 150)
-    
-        self.PB_heater_connect = QPushButton( "Connect" )
         self.PB_heater_connect.clicked.connect( self.on_click_connect_heater )
-        self.PB_heater_connect.setFixedWidth( 100)
-        self.PB_heater_refresh = QPushButton( "Refresh" )
         self.PB_heater_refresh.clicked.connect( self.update_heater_list )
-        self.PB_heater_refresh.setFixedWidth( 100)
-        layout_device.addWidget( self.heater_list )
-        layout_device.addWidget( self.PB_heater_connect )
-        layout_device.addWidget( self.PB_heater_refresh )
-
-        # Control
-        layout_control = QHBoxLayout()
-        layout_control.setContentsMargins( 30,0,30,0 )
-        
-        layout_values = QVBoxLayout()
-        layout_values.setContentsMargins( 0,0,0,0 )
-        layout_heater_current = QHBoxLayout()
-        layout_heater_current.setContentsMargins( 0,0,0,0 )
-        layout_heater_voltage = QHBoxLayout()
-        layout_heater_voltage.setContentsMargins( 0,0,0,0 )
-
-        self.PB_heater_enable = QPushButton( "ENABLE" )
         self.PB_heater_enable.clicked.connect( self.on_click_enable_heater )
-        self.PB_heater_enable.setFixedSize( 100,100)
-
-        label_MaxCurrent = QLabel("  Current (A): ")
-        label_MaxCurrent.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.LE_Heater_MaxCurrent = QLineEdit("2")
         self.LE_Heater_MaxCurrent.returnPressed.connect( self.update_heater_setting )
-        self.LE_Heater_MaxCurrent.setMaximumWidth( 100)
-        label_MaxVoltage = QLabel("  Voltage (V): ")
-        label_MaxVoltage.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.LE_Heater_MaxVoltage = QLineEdit("1.1")
-        self.LE_Heater_MaxVoltage.setMaximumWidth( 100)
         self.LE_Heater_MaxVoltage.returnPressed.connect( self.update_heater_setting )
-        
-        layout_heater_current.addWidget( label_MaxCurrent )
-        layout_heater_current.addWidget( self.LE_Heater_MaxCurrent )
-        layout_heater_voltage.addWidget( label_MaxVoltage )
-        layout_heater_voltage.addWidget( self.LE_Heater_MaxVoltage )
-        layout_values.addLayout( layout_heater_current)
-        layout_values.addLayout( layout_heater_voltage)
-        layout_control.addLayout( layout_values )
-        layout_control.addWidget( self.PB_heater_enable )
-        
-        self.group_heater_control = QGroupBox("")
-        self.group_heater_control.setLayout( layout_control )
-
-        layout_heater.addLayout( layout_device )
-        layout_heater.addWidget( self.group_heater_control )
-        layout_heater.setSpacing( 0 )
 
         self.group_heater_control.setEnabled(False)
     
     def make_panel_sensor(self):
-        # Device Manager Panel
-        self.group_sensor = QGroupBox("Sensor")
-        self.group_sensor.setFixedWidth( 400)
-        layout_sensor = QVBoxLayout()
-        self.group_sensor.setLayout( layout_sensor )
-
-        # Serial Port Manager
-        layout_device = QHBoxLayout()
-        layout_device.setContentsMargins( 0,0,0,0 )
-        self.sensor_list = QComboBox(  )
-        self.sensor_list.setFixedWidth( 150)
-        self.PB_sensor_connect = QPushButton( "Connect" )
         self.PB_sensor_connect.clicked.connect( self.on_click_connect_sensor )
-        self.PB_sensor_connect.setFixedWidth( 100)
-        self.PB_sensor_refresh = QPushButton( "Refresh" )
         self.PB_sensor_refresh.clicked.connect( self.update_sensor_list )
-        self.PB_sensor_refresh.setFixedWidth( 100)
-        layout_device.addWidget( self.sensor_list )
-        layout_device.addWidget( self.PB_sensor_connect )
-        layout_device.addWidget( self.PB_sensor_refresh )
-
-        ## Display
-        self.group_temp = QGroupBox("")
-        layout_temp = QHBoxLayout()
-
-        self.LE_temperature = QLabel("NA")
-        self.temp_font = self.font()
-        self.temp_font.setPointSize(20)
-        self.LE_temperature.setFont(self.temp_font)     
-        self.LE_temperature.setAlignment(Qt.AlignCenter)
-
-        layout_temp.addWidget(self.LE_temperature)
-        self.group_temp.setLayout( layout_temp )
-
-        layout_sensor.addLayout( layout_device )
-        layout_sensor.addWidget( self.group_temp)
-        layout_sensor.setSpacing( 0 )
-
         self.group_temp.setEnabled(False)
+        self.group_graph.setEnabled(False)
 
 
     #### HEATER RELATED
@@ -326,6 +177,18 @@ class MainWindow(QMainWindow):
         curr = float( self.LE_Heater_MaxCurrent.text() )
         volt = float( self.LE_Heater_MaxVoltage.text() )
 
+        if volt > self.heater.MAX_VOLTAGE:
+            volt = self.heater.MAX_VOLTAGE
+        elif volt < 0:
+            volt = 0
+        self.LE_Heater_MaxVoltage.setText(str(volt))
+
+        if curr > self.heater.MAX_CURRENT:
+            curr = self.heater.MAX_CURRENT
+        elif curr < 0:
+            curr = 0
+        self.LE_Heater_MaxCurrent.setText(str(curr))
+
         self.heater.set_current( curr )
         self.heater.set_voltage( volt )
 
@@ -383,10 +246,12 @@ class MainWindow(QMainWindow):
         if val :
             self.PB_sensor_connect.setText("Disconnect")
             self.group_temp.setEnabled(True)
+            self.group_graph.setEnabled(True)
             self.start_sensor()
         else:
             self.LE_temperature.setText("NA")
             self.group_temp.setEnabled(False)
+            self.group_graph.setEnabled(False)
             self.PB_sensor_connect.setText("Connect")
 
     def start_sensor( self ):
@@ -422,6 +287,15 @@ class MainWindow(QMainWindow):
         I = float(self.LE_PID_I.text())
         D = float(self.LE_PID_D.text())
         setpoint = float(self.LE_PID_setpoint.text())
+
+        self.pid_MaxCurrent = float(self.LE_PID_MaxCurrent.text())
+        if self.pid_MaxCurrent > self.heater.MAX_CURRENT:
+            self.pid_MaxCurrent = self.heater.MAX_CURRENT
+        elif self.pid_MaxCurrent < 0:
+            self.pid_MaxCurrent = 0
+        self.LE_PID_MaxCurrent.setText(str(self.pid_MaxCurrent))
+
+
         self.pid_worker.PID_value = (P,I,D)
         self.pid_worker.setpoint = setpoint
 
@@ -432,8 +306,12 @@ class MainWindow(QMainWindow):
             self.stop_pid()
 
     def start_pid( self ):
+        self.update_pid_setting()
+        
+        self.LE_Heater_MaxCurrent.setText( str(self.pid_MaxCurrent) )
         self.pid_running = True
         self.heater.set_voltage( 0 )
+        self.heater.set_current( self.pid_MaxCurrent )
         self.heater.set_enabled( True )
         # Step 2: Create a QThread object
         self.thread_pid = QThread()
@@ -476,7 +354,6 @@ class pid_worker( QObject ):
     PID_value = (1,0,0)
     setpoint = 25
     pid_sample_time = 0.1
-    
     stop = False
     cur_temp = 0
     signal_get_temp = pyqtSignal()
@@ -503,6 +380,8 @@ class pid_worker( QObject ):
                 break
 
             time.sleep( self.pid_sample_time )
+
+
 
 
 if __name__ == "__main__":

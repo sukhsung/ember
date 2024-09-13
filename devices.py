@@ -175,9 +175,17 @@ class Heater(Device):
         self.enabled = val
         self.changed_enabled = True
     def set_current( self, val ):
+        if val > self.MAX_CURRENT:
+            val = self.MAX_CURRENT
+        elif val < 0:
+            val = 0
         self.current = val
         self.changed_current = True
     def set_voltage( self, val ):
+        if val > self.MAX_VOLTAGE:
+            val = self.MAX_VOLTAGE
+        elif val < 0:
+            val = 0
         self.voltage = val
         self.changed_voltage = True
 
