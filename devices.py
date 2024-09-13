@@ -135,6 +135,9 @@ class Heater(Device):
 
     def dev_check(self):
         # Check if XPD_1830
+        # print( self.device.query('*IDN?'))
+        foo = self.device.query( 'ERR?')
+        foo = self.device.write( 'RST')
         id = self.device.query( 'ID?').split(' ')
         if len(id) > 1 and id[1].startswith( 'XPD18-30' ):
             self.dev_type = "XPD_1830"
